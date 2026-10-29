@@ -2,12 +2,12 @@ const { createApp } = require('./app');
 const { connectDatabase } = require('./config/db');
 const { getEnvConfig } = require('./config/env');
 
+const app = createApp();
+
 async function startServer() {
   const { port, nodeEnv, frontendOrigin } = getEnvConfig();
 
   await connectDatabase();
-
-  const app = createApp();
 
   const server = app.listen(port, () => {
     console.log(
@@ -24,7 +24,6 @@ async function startServer() {
     }
   });
 
-  // Graceful shutdown
   const shutdown = (signal) => {
     console.log(`[Nexora API] Received ${signal}. Shutting down gracefully...`);
     server.close(() => {
@@ -36,7 +35,12 @@ async function startServer() {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-startServer().catch((err) => {
-  console.error('[Nexora API] Fatal startup error:', err.message);
-  process.exit(1);
-});
+// Start standalone HTTP listener when running locally or on traditional Node hosts (not Vercel serverless)
+if (require.main === module && !process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('[Nexora API] Fatal startup error:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = app;

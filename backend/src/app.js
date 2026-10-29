@@ -3,7 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { getEnvConfig } = require('./config/env');
-const { getDatabaseStatus } = require('./config/db');
+const { connectDatabase, getDatabaseStatus } = require('./config/db');
 const { csrfProtection } = require('./middleware/csrf');
 const { createApiRateLimiter } = require('./middleware/rateLimiter');
 const authRoutes = require('./routes/authRoutes');
@@ -70,6 +70,18 @@ function createApp() {
 
   // Global API rate limiter
   app.use('/api', createApiRateLimiter());
+
+  // Ensure MongoDB connection is initialized on serverless cold starts (e.g. Vercel Express service)
+  app.use('/api', async (_req, _res, next) => {
+    try {
+      if (!getDatabaseStatus().connected) {
+        await connectDatabase();
+      }
+      return next();
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   // Health-check endpoint (safe diagnostic output, no secrets exposed)
   app.get('/api/health', (_req, res) => {
